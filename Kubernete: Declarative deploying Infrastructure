@@ -1,0 +1,216 @@
+Step 0: Setup Kubernetes environment with miniKube
+
+Run the following command to install miniKube —
+
+brew install minikube
+Now, run the command below to install Hyperkit, a hypervisor for Mac systems —
+
+brew install hyperkitbrew install hyperkit
+Finally, run the following command to start miniKube with hyperkit as the driver —
+
+minikube start --driver hyperkit
+You should observe miniKube running through a series of steps to create the Kubernetes Cluster and node.
+
+We can now verify that Kubernetes Cluster is ready by running the following command which displays the running Client and Server —
+
+kubectl version --short
+The output will include the version numbers of both the Client and Server you’re connected to.
+
+Run the followings commands in succession to verify the a node and default ClusterIP service was created when deploying the Kubernetes cluster —
+
+kubectl get all
+kubectl get nodes
+You will see similar results. One default Service of type “ClusterIP” and one “minikube” Node that is the master/control plane.
+
+Now that we’ve set up our environment, let’s proceed to Step 1 — Creating the Kubernetes deployment files using YAML to leverage IaC.
+
+Step 1: Create Kubernetes deployment files using YAML to leverage IaC
+As we proceed, use a preferred text editor in your local command line interface to create each YAML file.
+
+Here I will use the nano text editor to create a Kubernetes Service resource YAML file by running the following command —
+
+nano nginx-app-service.yml
+A text editor window should open. Copy and paste the code below into the text editor.
+
+#Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-app-service
+spec:
+  type: NodePort
+  selector:
+    app: nginx-app
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+Here we have the YAML file for deploying a NodePort Service. Let’s expand on its contents —
+
+A Kubernetes Service is being created named “nginx-app-service”.
+
+The “type” field is set to “Nodeport” which provides external access to the Kubernetes services connecting to a specific port on any node in the cluster.
+The “selector” specifies that this Service should direct traffic to pods with the label “nginx-app”
+The “ports” field is used to specify the port to be used for accessing the NodePort Service and the target port for the application running inside the Pods.
+Type the “Ctrl and O” key together to save the file, then press Enter. Type “Ctrl and X” to exit the text editor.
+
+Now, let’s proceed to creating the deployment YAML files that will be used to deploy the Pods according to the objectives.
+
+Create this new file using the nano text editor as we previously did, then copy the code below into the text window.
+
+#App Deployment 1
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx-app1
+  template:
+    metadata:
+      labels:
+        app: nginx-app1
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: nginx-vol
+          mountPath: /usr/share/nginx/html
+      volumes:
+      - name: nginx-vol
+        configMap:
+          name: index-html-configmap1
+---
+#ConfigMap1
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: index-html-configmap1
+data:
+  index.html: |
+    <html><body><h1>This is Deployment Two</h1></body></html::
+Here we have the first Kubernetes deployment YAML file for deploying an Nginx web server application using a ConfigMap to manage its configuration.
+
+Let’s break up the two sections — Deployment and ConfigMap.
+
+Deployment section:
+
+This section creates a Kubernetes Deployment named “deployment1”.
+The “replicas” field is set to 2, which indicates to the deployment to create and maintain two replicas of the pod template defined in the “template” section.
+The “selector” field defines a label selector “app: nginx-app1” that identifies the set of pods that would be managed by this deployment.
+The “template” field defines the Pod template that will be used to create the replica Pods.
+The “containers” field specifies the container details for the Pod. In this case, the container is an Nginx web server.
+The “ports” field specifies the port on which the container is listening which in this case is port 80.
+The “volumeMounts” field mounts a volume named “nginx-vol” at the path “/usr/share/nginx/html”, which will serve the web content.
+The “volumes” field is used to specify the volume that should be used in the Pod. In this case, it is the ConfigMap volume.
+ConfigMap section:
+
+This section creates a Kubernetes ConfigMap named “index-html-configmap1” which manages the configuration data for the Nginx web server application.
+The “data” field defines the key-value pairs of the configuration data. In this case, it contains an HTML file with the title “This is Deployment One!”.
+Save the file and exit the text editor, then we can move on to the create the second Kubernetes deployment YAML file.
+
+Apply the same explanations from the first deployment YAML file to the second deployment YAML file below —
+
+#App Deployment 2
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment2
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx-app2
+  template:
+    metadata:
+      labels:
+        app: nginx-app2
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: nginx-vol
+          mountPath: /usr/share/nginx/html
+      volumes:
+      - name: nginx-vol
+        configMap:
+          name: index-html-configmap2
+---
+#ConfigMap1
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: index-html-configmap2
+data:
+  index.html: |
+    <html><body><h1>This is Deployment Two</h1></body></html
+
+Once again, save the file and exit the text editor. We should now have three YAML files in our directory.
+
+A Service YAML file
+Deployment one's YAML file
+Deployment two’s YAML file
+We can now proceed to Step 2 — Applying these files to deploy the desired Kubernetes cluster pod infrastructure.
+
+Step 2: Deploy Kubernetes cluster pod infrastructure
+Run the following commands in succession to use the “kubectl” command to apply each YAML file.
+
+Apply Deployment 1 —
+
+ kubectl apply -f nginx-app-deployment1.yml
+Apply Deployment 2 —
+
+kubectl apply -f nginx-app-deployment2.yml
+Apply Service —
+
+kubectl apply -f nginx-app-service.yaml
+Run the following command to display all pods, services, deployments and replica stets.
+
+kubectl get all
+You should received similar outputs after running all the command.
+
+Now that our infrastructure has been successfully deployed, we can proceed to Step 3 — Validating access to both deployments using the Service.
+
+Step 3: Validate access to both Deployment 1 and Deployment 2 through Service
+Let’s get the IP Address of the Service which we will use to reach both deployments pods by runing the following command —
+
+kubectl get service
+Locate and copy the IP Address of the Service previously created.
+
+Run the following command using the IP address of the Service and include Port 80 where each Nginx web server pod is listening on —
+
+curl <service_ip_address>:80
+Now quickly run the command repeatedly, then verify that you can reach both deployments by observing the outputs served from the two Nginx web server’s html files.
+
+As shown below, we eventually get both outputs as the Service acts as an internal load balancer. It bounces between the two Nginx web server pods on the separate Deployments serving the content of their html files — “This is Deployment one” and “This is Deployment two”.
+
+Congratulations!
+You’ve successfully completed “Declaring the Kubes”. You’ve learned Kubernetes fundamental commands and concepts to create a cluster of two Nginx web server Pods and a NodePort Service that distributes traffic between the Pods!
+
+Clean up
+Note, the following commands delete all of their respectful kind, “kubectl delete deployments --all” deletes all deployments.
+
+Remove all deployments —
+
+kubectl delete deployments --all
+Remove all services —
+
+kubectl delete services --all
+Removes all config maps —
+
+kubectl delete configmaps--all
+If you’ve got this far, thanks for reading! I hope it was worthwhile to you.
+
+
+
+
+
+
